@@ -1,4 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { TaskTypeormEntity } from './tasks.entity';
 
 export interface Task {
   id: string;
@@ -9,52 +12,42 @@ export interface Task {
 
 @Injectable()
 export class TasksService {
-  private tasks: Task[] = [
-    {
-      id: '1',
-      title: 'Lire Tasks',
-      description: 'Lire la liste des tasks',
-      done: true,
-    },
-  ];
-  findAll(): Task[] {
-    return this.tasks;
+  constructor(
+    @InjectRepository(TaskTypeormEntity)
+    private readonly taskRepo: Repository<TaskTypeormEntity>,
+  ) {}
+
+  async findAll(): Promise<Task[]> {
+    const tasks = await this.taskRepo.find();
+
+    return tasks;
   }
 
-  findOne(id: string) {
-    const task = this.tasks.find((t) => t.id === id);
+  async findOne(id: string): Promise<Task> {
+    const task = await this.taskRepo.findOneBy({ id });
 
     if (!task) throw new NotFoundException(`Task ${id} introuvable`);
 
     return task;
   }
 
-  create(title: string, description: string): Task {
-    const task: Task = {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      done: false,
-    };
+  async create(title: string, description: string): Promise<Task> {
+    const newTask = await this.taskRepo.save({ title, description });
 
-    this.tasks.push(task);
-
-    return task;
+    return newTask;
   }
 
-  updateStatus(id: string, done: boolean): Task {
-    const task = this.findOne(id);
+  async updateStatus(id: string, done: boolean): Promise<Task> {
+    const task = await this.findOne(id);
 
     task.done = done;
 
+    await this.taskRepo.save(task);
+
     return task;
   }
 
-  remove(id: string): void {
-    const index = this.tasks.findIndex((t) => t.id === id);
-
-    if (index === -1) throw new NotFoundException(`Task ${id} introuvable`);
-
-    this.tasks.splice(index, 1);
+  async remove(id: string): Promise<void> {
+    await this.taskRepo.delete({ id });
   }
 }
